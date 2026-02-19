@@ -2,6 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Trash2, Plus, ChevronDown, Calendar, Play, Pause } from 'lucide-react';
 
 const TimeTrackerV2 = () => {
+  // Login state
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('ktt-logged-in') === 'true';
+  });
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [showWhoAreYouModal, setShowWhoAreYouModal] = useState(false);
+  const [whoAreYouInput, setWhoAreYouInput] = useState('');
+
   // User state
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('tt-current-user');
@@ -82,6 +91,13 @@ const TimeTrackerV2 = () => {
     return new Date().toISOString().split('T')[0];
   });
 
+  // Check if user is on default and needs to select a name
+  useEffect(() => {
+    if (isLoggedIn && currentUser === 'default') {
+      setShowWhoAreYouModal(true);
+    }
+  }, [isLoggedIn, currentUser]);
+
   // Persist current user
   useEffect(() => {
     localStorage.setItem('tt-current-user', currentUser);
@@ -117,6 +133,42 @@ const TimeTrackerV2 = () => {
     }
     return () => clearInterval(interval);
   }, [isTimerRunning]);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword }),
+      });
+
+      if (response.ok) {
+        setIsLoggedIn(true);
+        localStorage.setItem('ktt-logged-in', 'true');
+        setLoginPassword('');
+      } else {
+        setLoginError('Invalid password');
+      }
+    } catch (err) {
+      setLoginError('Connection error. Check server is running.');
+    }
+  };
+
+  const handleWhoAreYou = () => {
+    if (!whoAreYouInput.trim()) return;
+    const newUsername = whoAreYouInput.trim().toLowerCase();
+    
+    if (!users.includes(newUsername)) {
+      setUsers([...users, newUsername]);
+    }
+    
+    setCurrentUser(newUsername);
+    setWhoAreYouInput('');
+    setShowWhoAreYouModal(false);
+  };
 
   const startTimer = () => {
     if (!selectedCategory) return;
@@ -163,6 +215,61 @@ const TimeTrackerV2 = () => {
       return `${hours}h ${minutes}m ${secs}s`;
     }
     return `${minutes}m ${secs}s`;
+  };
+
+  const roundMinutes = (minutes) => {
+    return Math.round(minutes * 100) / 100;
+  };
+
+  const formatTimeForInput = (isoString) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const formatTimeForDisplay = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  };
+
+  const downloadCSV = () => {
+    if (savedEntries.length === 0) {
+      alert('No saved entries to download');
+      return;
+    }
+
+    const headers = ['Date', 'Category', 'Start Time', 'Stop Time', 'Minutes', 'Hours', 'Notes'];
+    const rows = savedEntries.map((entry) => [
+      entry.date,
+      getCategoryName(entry.categoryId),
+      new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      new Date(entry.stopTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      entry.minutes,
+      (entry.minutes / 60).toFixed(2),
+      entry.notes,
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) =>
+        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time-tracker-${currentUser}-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   };
 
   const addCategory = () => {
@@ -224,61 +331,6 @@ const TimeTrackerV2 = () => {
     return categories.find((c) => c.id === categoryId)?.color || '#6366f1';
   };
 
-  const roundMinutes = (minutes) => {
-    return Math.round(minutes * 100) / 100;
-  };
-
-  const formatTimeForInput = (isoString) => {
-    if (!isoString) return '';
-    const date = new Date(isoString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const formatTimeForDisplay = (isoString) => {
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-  };
-
-  const downloadCSV = () => {
-    if (savedEntries.length === 0) {
-      alert('No saved entries to download');
-      return;
-    }
-
-    const headers = ['Date', 'Category', 'Start Time', 'Stop Time', 'Minutes', 'Hours', 'Notes'];
-    const rows = savedEntries.map((entry) => [
-      entry.date,
-      getCategoryName(entry.categoryId),
-      new Date(entry.startTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      new Date(entry.stopTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      entry.minutes,
-      (entry.minutes / 60).toFixed(2),
-      entry.notes,
-    ]);
-
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) =>
-        row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-      ),
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `time-tracker-${currentUser}-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  };
-
   const updateDraftNotes = (draftId, newNotes) => {
     setDraftEntries(
       draftEntries.map((d) =>
@@ -295,11 +347,18 @@ const TimeTrackerV2 = () => {
     );
   };
 
+  const updateDraftCategory = (draftId, newCategoryId) => {
+    setDraftEntries(
+      draftEntries.map((d) =>
+        d.id === draftId ? { ...d, categoryId: newCategoryId } : d
+      )
+    );
+  };
+
   const updateDraftStartTime = (draftId, newStartTimeString) => {
     setDraftEntries(
       draftEntries.map((d) => {
         if (d.id === draftId) {
-          // Parse datetime-local as local time, not UTC
           const [datePart, timePart] = newStartTimeString.split('T');
           const [year, month, day] = datePart.split('-');
           const [hours, minutes] = timePart.split(':');
@@ -318,7 +377,6 @@ const TimeTrackerV2 = () => {
     setDraftEntries(
       draftEntries.map((d) => {
         if (d.id === draftId) {
-          // Parse datetime-local as local time, not UTC
           const [datePart, timePart] = newStopTimeString.split('T');
           const [year, month, day] = datePart.split('-');
           const [hours, minutes] = timePart.split(':');
@@ -333,16 +391,12 @@ const TimeTrackerV2 = () => {
     );
   };
 
-  const updateDraftCategory = (draftId, newCategoryId) => {
-    setDraftEntries(
-      draftEntries.map((d) =>
-        d.id === draftId ? { ...d, categoryId: newCategoryId } : d
-      )
-    );
+  const deleteDraft = (draftId) => {
+    setDraftEntries(draftEntries.filter((d) => d.id !== draftId));
+    setEditingDraftId(null);
   };
 
   const saveAllDrafts = () => {
-    // Update draft dates to match their start times before saving
     const updatedDrafts = draftEntries.map((draft) => {
       const startDate = new Date(draft.startTime);
       const year = startDate.getFullYear();
@@ -354,15 +408,6 @@ const TimeTrackerV2 = () => {
 
     setSavedEntries([...savedEntries, ...updatedDrafts]);
     setDraftEntries([]);
-  };
-
-  const moveDayBackToDrafts = (date) => {
-    const dayEntries = groupedSavedEntries[date];
-    if (!dayEntries) return;
-
-    // Move entries from saved back to drafts
-    setDraftEntries([...dayEntries, ...draftEntries]);
-    setSavedEntries(savedEntries.filter((e) => e.date !== date));
   };
 
   const handleKeyPress = (e, callback) => {
@@ -382,6 +427,14 @@ const TimeTrackerV2 = () => {
     setUsers([...users, newUser]);
     setCurrentUser(newUser);
     setNewUsername('');
+  };
+
+  const moveDayBackToDrafts = (date) => {
+    const dayEntries = groupedSavedEntries[date];
+    if (!dayEntries) return;
+
+    setDraftEntries([...dayEntries, ...draftEntries]);
+    setSavedEntries(savedEntries.filter((e) => e.date !== date));
   };
 
   // Group entries by date
@@ -435,6 +488,120 @@ const TimeTrackerV2 = () => {
       return dayData;
     });
 
+  // LOGIN SCREEN
+  if (!isLoggedIn) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+          <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem', padding: '2rem' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: '600', margin: '0 0 1.5rem 0', textAlign: 'center' }}>
+              KTOO Time Tracker
+            </h1>
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.875rem', color: '#cbd5e1', display: 'block', marginBottom: '0.5rem' }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Enter password"
+                  style={{
+                    width: '100%',
+                    padding: '0.625rem',
+                    background: '#0f172a',
+                    border: '1px solid #334155',
+                    borderRadius: '0.375rem',
+                    color: '#e2e8f0',
+                    fontSize: '0.95rem',
+                    boxSizing: 'border-box',
+                  }}
+                  autoFocus
+                />
+              </div>
+              {loginError && (
+                <div style={{ color: '#ef4444', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                  {loginError}
+                </div>
+              )}
+              <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  padding: '0.625rem',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer',
+                  fontSize: '0.95rem',
+                  fontWeight: '500',
+                }}
+              >
+                Login
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // WHO ARE YOU MODAL
+  if (showWhoAreYouModal) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '0.5rem', padding: '2rem', maxWidth: '400px', width: '100%', margin: '2rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 1rem 0' }}>
+            Who are you?
+          </h2>
+          <p style={{ color: '#94a3b8', marginBottom: '1rem', fontSize: '0.9rem' }}>
+            Enter your name to get started
+          </p>
+          <input
+            type="text"
+            value={whoAreYouInput}
+            onChange={(e) => setWhoAreYouInput(e.target.value)}
+            onKeyPress={(e) => e.key === 'Enter' && handleWhoAreYou()}
+            placeholder="Your name"
+            style={{
+              width: '100%',
+              padding: '0.625rem',
+              background: '#0f172a',
+              border: '1px solid #334155',
+              borderRadius: '0.375rem',
+              color: '#e2e8f0',
+              fontSize: '0.95rem',
+              marginBottom: '1rem',
+              boxSizing: 'border-box',
+            }}
+            autoFocus
+          />
+          <button
+            onClick={handleWhoAreYou}
+            disabled={!whoAreYouInput.trim()}
+            style={{
+              width: '100%',
+              padding: '0.625rem',
+              background: '#10b981',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: whoAreYouInput.trim() ? 'pointer' : 'not-allowed',
+              fontSize: '0.95rem',
+              fontWeight: '500',
+              opacity: whoAreYouInput.trim() ? 1 : 0.5,
+            }}
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // MAIN APP
   return (
     <div style={{ minHeight: '100vh', background: '#0f172a', color: '#e2e8f0' }}>
       {/* Header */}
@@ -500,9 +667,27 @@ const TimeTrackerV2 = () => {
               cursor: newUsername.trim() && !users.includes(newUsername.trim()) ? 'pointer' : 'not-allowed',
               fontSize: '0.9rem',
               opacity: newUsername.trim() && !users.includes(newUsername.trim()) ? 1 : 0.5,
+              marginLeft: 'auto',
             }}
           >
             Add
+          </button>
+          <button
+            onClick={() => {
+              setIsLoggedIn(false);
+              localStorage.removeItem('ktt-logged-in');
+            }}
+            style={{
+              padding: '0.5rem 0.75rem',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+            }}
+          >
+            Logout
           </button>
         </div>
       </div>
@@ -1398,7 +1583,7 @@ const TimeTrackerV2 = () => {
                             })}
                           </div>
                           <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                            {dayEntries.length} entry{dayEntries.length !== 1 ? 'ies' : ''} • {dayTotalMinutes} min ({dayTotalHours} hours)
+                            {dayEntries.length} entry{dayEntries.length !== 1 ? 'ies' : ''} • {dayTotalMinutes.toFixed(2)} min ({dayTotalHours} hours)
                           </div>
                         </div>
                       </div>
