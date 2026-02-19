@@ -1389,36 +1389,40 @@ const TimeTrackerV2 = () => {
                         zIndex: 10,
                         pointerEvents: 'none',
                       }}>
-                        {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip) && (
-                          <>
+                        {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip) && (() => {
+                          const totalMinutes = categoryBreakdown.reduce((sum, c) => sum + c.minutes, 0);
+                          const cat = categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip);
+                          const percentage = ((cat.minutes / totalMinutes) * 100).toFixed(1);
+                          return (
                             <div style={{ fontWeight: '500', color: '#e2e8f0' }}>
-                              {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).name}
+                              {cat.name} - {percentage}%
                             </div>
-                            <div style={{ color: '#94a3b8' }}>
-                              {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).minutes.toFixed(2)} min ({(categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).minutes / 60).toFixed(1)}h)
-                            </div>
-                          </>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
                   <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {categoryBreakdown.map((cat) => (
-                      <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                        <div
-                          style={{
-                            width: '10px',
-                            height: '10px',
-                            borderRadius: '50%',
-                            background: cat.color,
-                          }}
-                        />
-                        <span>{cat.name}</span>
-                        <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
-                          {cat.minutes.toFixed(2)} min ({(cat.minutes / 60).toFixed(1)}h)
-                        </span>
-                      </div>
-                    ))}
+                    {categoryBreakdown.map((cat) => {
+                      const totalMinutes = categoryBreakdown.reduce((sum, c) => sum + c.minutes, 0);
+                      const percentage = ((cat.minutes / totalMinutes) * 100).toFixed(1);
+                      return (
+                        <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                          <div
+                            style={{
+                              width: '10px',
+                              height: '10px',
+                              borderRadius: '50%',
+                              background: cat.color,
+                            }}
+                          />
+                          <span>{cat.name}</span>
+                          <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
+                            {(cat.minutes / 60).toFixed(1)}h - {percentage}%
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1467,30 +1471,32 @@ const TimeTrackerV2 = () => {
                                         onMouseEnter={() => setHoveredTooltip(`bar-${day.date}-${cat.id}`)}
                                         onMouseLeave={() => setHoveredTooltip(null)}
                                       >
-                                        {hoveredTooltip === `bar-${day.date}-${cat.id}` && (
+                                        {hoveredTooltip === `bar-${day.date}-${cat.id}` && (() => {
+                                        const totalHours = Object.keys(day)
+                                          .filter((k) => k !== 'date')
+                                          .reduce((sum, k) => sum + (day[k] || 0), 0);
+                                        const percentage = ((hours / totalHours) * 100).toFixed(1);
+                                        return (
                                           <div style={{
                                             position: 'absolute',
-                                            bottom: '100%',
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
                                             background: '#1e293b',
                                             border: '1px solid #334155',
                                             borderRadius: '0.375rem',
                                             padding: '0.5rem 0.75rem',
                                             fontSize: '0.8rem',
                                             whiteSpace: 'nowrap',
-                                            zIndex: 10,
-                                            marginBottom: '0.5rem',
+                                            zIndex: 50,
                                             pointerEvents: 'none',
+                                            top: '-50px',
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
                                           }}>
                                             <div style={{ fontWeight: '500', color: '#e2e8f0' }}>
-                                              {cat.name}
-                                            </div>
-                                            <div style={{ color: '#94a3b8' }}>
-                                              {hours.toFixed(1)}h
+                                              {cat.name} - {percentage}%
                                             </div>
                                           </div>
-                                        )}
+                                        );
+                                      })()}
                                       </div>
                                     )
                                   );
