@@ -25,13 +25,14 @@ A personal time tracking web application for KTOO Public Media staff to log and 
 
 - Node.js v16 or higher
 - npm
+- Password configuration file (see Setup section below)
 
 ### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/kburki/KTT.git
-cd KTT
+git clone https://github.com/kburki/ktt.git
+cd ktt
 ```
 
 2. Install dependencies:
@@ -39,12 +40,33 @@ cd KTT
 npm install
 ```
 
-3. Start the development server:
+### Setup
+
+1. Create a password config directory:
 ```bash
-npm start
+mkdir -p ~/config/ktt-config
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
+2. Create `~/config/ktt-config/password.json`:
+```json
+{
+  "password": "your-secure-password-here"
+}
+```
+
+3. Create `.env.local` in the ktt project root:
+```
+KTT_CONFIG_PATH=~/config/ktt-config/password.json
+```
+
+4. Build and start:
+```bash
+npm run build
+npm install -g pm2
+pm2 start "npx serve -s build -l 3000"
+```
+
+5. Access at [http://localhost:3000](http://localhost:3000) (or your server IP:3000)
 
 ## Usage
 
