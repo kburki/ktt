@@ -80,6 +80,8 @@ const TimeTrackerV2 = () => {
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategoryColor, setEditingCategoryColor] = useState('');
   const [hoveredTooltip, setHoveredTooltip] = useState(null);
+  const [draggedCategoryId, setDraggedCategoryId] = useState(null);
+  const [dragOverCategoryId, setDragOverCategoryId] = useState(null);
 
   // Analytics state
   const [analyticsStartDate, setAnalyticsStartDate] = useState(() => {
@@ -321,6 +323,51 @@ const TimeTrackerV2 = () => {
     if (selectedCategory === id) {
       setSelectedCategory(categories[0]?.id || '');
     }
+  };
+
+  const handleCategoryDragStart = (e, categoryId) => {
+    setDraggedCategoryId(categoryId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleCategoryDragOver = (e, categoryId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCategoryId(categoryId);
+  };
+
+  const handleCategoryDragLeave = () => {
+    setDragOverCategoryId(null);
+  };
+
+  const handleCategoryDrop = (e, targetCategoryId) => {
+    e.preventDefault();
+    setDragOverCategoryId(null);
+
+    if (!draggedCategoryId || draggedCategoryId === targetCategoryId) {
+      setDraggedCategoryId(null);
+      return;
+    }
+
+    const draggedIndex = categories.findIndex((c) => c.id === draggedCategoryId);
+    const targetIndex = categories.findIndex((c) => c.id === targetCategoryId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedCategoryId(null);
+      return;
+    }
+
+    const newCategories = [...categories];
+    const [draggedItem] = newCategories.splice(draggedIndex, 1);
+    newCategories.splice(targetIndex, 0, draggedItem);
+
+    setCategories(newCategories);
+    setDraggedCategoryId(null);
+  };
+
+  const handleCategoryDragEnd = () => {
+    setDraggedCategoryId(null);
+    setDragOverCategoryId(null);
   };
 
   const getCategoryName = (categoryId) => {
@@ -979,13 +1026,22 @@ const TimeTrackerV2 = () => {
                       </div>
                     ) : (
                       <div
+                        draggable
+                        onDragStart={(e) => handleCategoryDragStart(e, cat.id)}
+                        onDragOver={(e) => handleCategoryDragOver(e, cat.id)}
+                        onDragLeave={handleCategoryDragLeave}
+                        onDrop={(e) => handleCategoryDrop(e, cat.id)}
+                        onDragEnd={handleCategoryDragEnd}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           padding: '0.75rem',
-                          background: '#0f172a',
+                          background: dragOverCategoryId === cat.id ? '#1e293b' : '#0f172a',
                           borderRadius: '0.375rem',
-                          border: '1px solid #334155',
+                          border: dragOverCategoryId === cat.id ? '2px solid #3b82f6' : '1px solid #334155',
+                          cursor: 'grab',
+                          opacity: draggedCategoryId === cat.id ? 0.6 : 1,
+                          transition: 'all 0.2s',
                         }}
                       >
                         <div
@@ -1389,40 +1445,36 @@ const TimeTrackerV2 = () => {
                         zIndex: 10,
                         pointerEvents: 'none',
                       }}>
-                        {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip) && (() => {
-                          const totalMinutes = categoryBreakdown.reduce((sum, c) => sum + c.minutes, 0);
-                          const cat = categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip);
-                          const percentage = ((cat.minutes / totalMinutes) * 100).toFixed(1);
-                          return (
+                        {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip) && (
+                          <>
                             <div style={{ fontWeight: '500', color: '#e2e8f0' }}>
-                              {cat.name} - {percentage}%
+                              {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).name}
                             </div>
-                          );
-                        })()}
+                            <div style={{ color: '#94a3b8' }}>
+                              {categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).minutes.toFixed(2)} min ({(categoryBreakdown.find(c => `pie-${c.name}` === hoveredTooltip).minutes / 60).toFixed(1)}h)
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
                   <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {categoryBreakdown.map((cat) => {
-                      const totalMinutes = categoryBreakdown.reduce((sum, c) => sum + c.minutes, 0);
-                      const percentage = ((cat.minutes / totalMinutes) * 100).toFixed(1);
-                      return (
-                        <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-                          <div
-                            style={{
-                              width: '10px',
-                              height: '10px',
-                              borderRadius: '50%',
-                              background: cat.color,
-                            }}
-                          />
-                          <span>{cat.name}</span>
-                          <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
-                            {(cat.minutes / 60).toFixed(1)}h - {percentage}%
-                          </span>
-                        </div>
-                      );
-                    })}
+                    {categoryBreakdown.map((cat) => (
+                      <div key={cat.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                        <div
+                          style={{
+                            width: '10px',
+                            height: '10px',
+                            borderRadius: '50%',
+                            background: cat.color,
+                          }}
+                        />
+                        <span>{cat.name}</span>
+                        <span style={{ marginLeft: 'auto', color: '#94a3b8' }}>
+                          {cat.minutes.toFixed(2)} min ({(cat.minutes / 60).toFixed(1)}h)
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1471,32 +1523,30 @@ const TimeTrackerV2 = () => {
                                         onMouseEnter={() => setHoveredTooltip(`bar-${day.date}-${cat.id}`)}
                                         onMouseLeave={() => setHoveredTooltip(null)}
                                       >
-                                        {hoveredTooltip === `bar-${day.date}-${cat.id}` && (() => {
-                                        const totalHours = Object.keys(day)
-                                          .filter((k) => k !== 'date')
-                                          .reduce((sum, k) => sum + (day[k] || 0), 0);
-                                        const percentage = ((hours / totalHours) * 100).toFixed(1);
-                                        return (
+                                        {hoveredTooltip === `bar-${day.date}-${cat.id}` && (
                                           <div style={{
                                             position: 'absolute',
+                                            bottom: '100%',
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
                                             background: '#1e293b',
                                             border: '1px solid #334155',
                                             borderRadius: '0.375rem',
                                             padding: '0.5rem 0.75rem',
                                             fontSize: '0.8rem',
                                             whiteSpace: 'nowrap',
-                                            zIndex: 50,
+                                            zIndex: 10,
+                                            marginBottom: '0.5rem',
                                             pointerEvents: 'none',
-                                            top: '-50px',
-                                            left: '50%',
-                                            transform: 'translateX(-50%)',
                                           }}>
                                             <div style={{ fontWeight: '500', color: '#e2e8f0' }}>
-                                              {cat.name} - {percentage}%
+                                              {cat.name}
+                                            </div>
+                                            <div style={{ color: '#94a3b8' }}>
+                                              {hours.toFixed(1)}h
                                             </div>
                                           </div>
-                                        );
-                                      })()}
+                                        )}
                                       </div>
                                     )
                                   );
