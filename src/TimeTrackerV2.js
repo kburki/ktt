@@ -125,16 +125,17 @@ const TimeTrackerV2 = () => {
     localStorage.setItem(getUserKey('draft-entries'), JSON.stringify(draftEntries));
   }, [draftEntries, currentUser]);
 
-  // Timer tick
+  // Timer tick - updates every 100ms for accurate display even when tab is backgrounded
   useEffect(() => {
     let interval;
-    if (isTimerRunning) {
+    if (isTimerRunning && timerStartTime) {
       interval = setInterval(() => {
-        setTimerSeconds((s) => s + 1);
-      }, 1000);
+        const elapsed = Math.floor((new Date().getTime() - timerStartTime.getTime()) / 1000);
+        setTimerSeconds(elapsed);
+      }, 100);
     }
     return () => clearInterval(interval);
-  }, [isTimerRunning]);
+  }, [isTimerRunning, timerStartTime]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -175,15 +176,17 @@ const TimeTrackerV2 = () => {
   const startTimer = () => {
     if (!selectedCategory) return;
     setIsTimerRunning(true);
-    setTimerStartTime(Date.now());
+    setTimerStartTime(new Date());
   };
 
   const stopTimer = () => {
     if (!isTimerRunning) return;
     
     const stopTime = new Date();
-    const startTime = new Date(stopTime.getTime() - timerSeconds * 1000);
-    const minutes = Math.round((timerSeconds / 60) * 100) / 100;
+    const startTime = timerStartTime || new Date(stopTime.getTime() - timerSeconds * 1000);
+    const minutes = timerStartTime 
+      ? Math.round(((stopTime.getTime() - timerStartTime.getTime()) / 1000 / 60) * 100) / 100
+      : Math.round((timerSeconds / 60) * 100) / 100;
     
     // Get local date (not UTC)
     const year = stopTime.getFullYear();
