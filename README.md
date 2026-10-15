@@ -1,6 +1,6 @@
-# KTOO Time Tracker
+# Time Tracker
 
-A personal time tracking web application for KTOO Public Media staff to log and analyze how time is spent across different roles and responsibilities.
+A personal time tracking web application for staff to log and analyze how time is spent across different roles and responsibilities.
 
 ## Features
 
@@ -88,7 +88,7 @@ When deployed with a password login, ensure the password configuration file is s
 
 ## Contributing
 
-For KTOO team members - please create a branch for any feature additions or bug fixes.
+For team members - please create a branch for any feature additions or bug fixes.
 
 ## License
 
